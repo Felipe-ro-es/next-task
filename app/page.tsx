@@ -1,65 +1,142 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { getTasks, createTask, deleteTask, editTask } from './actions/tasks';
+import FormTasks, { FormTasksType } from '@/components/FormTasks';
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string; title?: string; description?: string }>;
+}) {
+  const { id, title, description } = await searchParams;
+  const tasks = await getTasks();
+
+  async function handleSubmit(data: FormTasksType) {
+    'use server';
+    await createTask(data);
+  }
+
+  async function handleDelete(formData: FormData) {
+    'use server';
+    const id = Number(formData.get('id'));
+    await deleteTask({ id });
+  }
+
+  async function handleComplete(formData: FormData) {
+    'use server';
+    const id = Number(formData.get('id'));
+    const task = tasks.find((t: any) => t.id === id);
+    if (task) {
+      await editTask({ ...task, status: 'done' });
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">📝 Lista de Tarefas</h1>
+
+      <FormTasks
+        defaultValues={{
+          id: id ? parseInt(id) : undefined,
+          title: title || '',
+          description: description || '',
+        }}
+        onSubmit={handleSubmit}
+      />
+
+      {/* 🔎 Filtros por status (feito no cliente via componente abaixo) */}
+      <TaskList
+        tasks={tasks}
+        onDelete={handleDelete}
+        onComplete={handleComplete}
+      />
+    </main>
   );
 }
+
+// Componente client-side de filtragem e renderização da lista
+'use client';
+import { useState } from 'react';
+import { number } from 'zod';
+
+function TaskList({
+  tasks,
+  onDelete,
+  onComplete,
+}: {
+  tasks: any[];
+  onDelete: (formData: FormData) => Promise<void>;
+  onComplete: (formData: FormData) => Promise<void>;
+}) {
+  const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('all');
+
+  const filtered = tasks.filter((t) => {
+    if (filter === 'all') return true;
+    return t.status === filter;
+  });
+
+  return (
+    <>
+      <div className="my-4">
+        <button
+          onClick={() => setFilter('all')}
+          className={`mr-2 ${filter === 'all' ? 'font-bold' : ''}`}
+        >
+          Todas
+        </button>
+        <button
+          onClick={() => setFilter('pending')}
+          className={`mr-2 ${filter === 'pending' ? 'font-bold' : ''}`}
+        >
+          Pendentes
+        </button>
+        <button
+          onClick={() => setFilter('done')}
+          className={`${filter === 'done' ? 'font-bold' : ''}`}
+        >
+          Concluídas
+        </button>
+      </div>
+
+      <ul className="mt-4">
+        {filtered.map((t) => (
+          <li
+            key={t.id}
+            className="border-b py-2 flex justify-between items-center"
+          >
+            <div>
+              <h3
+                className={`font-bold ${
+                  t.status === 'done' ? 'line-through text-gray-500' : ''
+                }`}
+              >
+                {t.title}
+              </h3>
+              <p>{t.description}</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Link
+                href={`/edit/?id=${t.id}&title=${t.title}&description=${t.description}`}
+              >
+                <button className="text-blue-500">EDIT</button>
+              </Link>
+
+              <form action={onDelete}>
+                <input type="hidden" name="id" value={t.id} />
+                <button className="text-red-500">DELETE</button>
+              </form>
+
+              {t.status !== 'done' && (
+                <form action={onComplete}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <button className="text-green-500">COMPLETE</button>
+                </form>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
