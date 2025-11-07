@@ -62,5 +62,20 @@ export async function deleteTask(formData: FormTasksType) {
     console.error('Error deleting task:', error);
     return { success: false };
   }
+  
+}
+
+export async function toggleComplete(id: number) {
+  try {
+    await API.patch(`/tasks/${id}`, {
+      completed: true,
+    });
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (e) {
+    console.log("Error completing task:", e);
+    return { success: false };
+  }
 }
 

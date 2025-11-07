@@ -1,11 +1,12 @@
 'use client'
 import { useForm } from 'react-hook-form';
 export type FormTasksType = {
-  title: string;
-  description: string;
   id?: number;
-  completed?: 'pending' | 'done';
+  title?: string;
+  description?: string;
+  completed?: boolean;
 };
+
 function FormTasks({
   onSubmit,
   defaultValues
